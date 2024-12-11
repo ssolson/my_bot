@@ -2,114 +2,71 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 
-
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription, TimerAction
+from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import Command
-from launch.actions import RegisterEventHandler
-from launch.event_handlers import OnProcessStart
 
 from launch_ros.actions import Node
 
 
-
 def generate_launch_description():
 
-
-    # Include the robot_state_publisher launch file, provided by our own package. Force sim time to be enabled
-    # !!! MAKE SURE YOU SET THE PACKAGE NAME CORRECTLY !!!
-
-    package_name='my_bot' #<--- CHANGE ME
+    # Include the robot_state_publisher launch file
+    package_name = 'my_bot'  # <--- CHANGE ME
 
     rsp = IncludeLaunchDescription(
-                PythonLaunchDescriptionSource([os.path.join(
-                    get_package_share_directory(package_name),'launch','rsp.launch.py'
-                )]), launch_arguments={'use_sim_time': 'false', 'use_ros2_control': 'true'}.items()
+        PythonLaunchDescriptionSource([os.path.join(
+            get_package_share_directory(package_name), 'launch', 'rsp.launch.py'
+        )]), launch_arguments={'use_sim_time': 'false', 'use_ros2_control': 'true'}.items()
     )
 
-    # joystick = IncludeLaunchDescription(
-    #             PythonLaunchDescriptionSource([os.path.join(
-    #                 get_package_share_directory(package_name),'launch','joystick.launch.py'
-    #             )])
-    # )
+    # Add the RPLIDAR Node
+    rplidar_node = Node(
+        package='rplidar_ros',
+        executable='rplidar_composition',
+        output='screen',
+        parameters=[{
+            'frame_id': 'laser_frame',
+            'angle_compensate': True,
+            'scan_mode': 'Standard'
+        }]
+    )
 
+    # Add the Laser Scan Matcher Node
+    laser_scan_matcher_node = Node(
+        package='ros2_laser_scan_matcher',
+        executable='laser_scan_matcher',
+        name='odometry_publisher',
+        output='screen',
+        parameters=[{
+            'use_sim_time': False,  # Ensure sim time is disabled
+            'base_frame': 'base_link',
+            'odom_frame': 'odom_matcher',
+            'laser_frame': 'laser_frame',
+            'publish_odom': '/odom_matcher',
+            'publish_tf': True
+        }]
+    )
 
-    # twist_mux_params = os.path.join(get_package_share_directory(package_name),'config','twist_mux.yaml')
-    # twist_mux = Node(
-    #         package="twist_mux",
-    #         executable="twist_mux",
-    #         parameters=[twist_mux_params],
-    #         remappings=[('/cmd_vel_out','/diff_cont/cmd_vel_unstamped')]
-    #     )
+    # Add the SLAM Toolbox Node
+    slam_toolbox_params = os.path.join(
+        get_package_share_directory(package_name),
+        'config',
+        'mapper_params_online_async.yaml'  # Path to your SLAM toolbox params
+    )
 
-    
+    slam_toolbox_node = Node(
+        package='slam_toolbox',
+        executable='async_slam_toolbox_node',
+        name='slam_toolbox',
+        output='screen',
+        parameters=[slam_toolbox_params, {'use_sim_time': False}]  # Set sim time to false
+    )
 
-
-    # robot_description = Command(['ros2 param get --hide-type /robot_state_publisher robot_description'])
-
-    # controller_params_file = os.path.join(get_package_share_directory(package_name),'config','my_controllers.yaml')
-
-    # controller_manager = Node(
-    #     package="controller_manager",
-    #     executable="ros2_control_node",
-    #     parameters=[{'robot_description': robot_description},
-    #                 controller_params_file]
-    # )
-
-    # delayed_controller_manager = TimerAction(period=3.0, actions=[controller_manager])
-
-    # diff_drive_spawner = Node(
-    #     package="controller_manager",
-    #     executable="spawner.py",
-    #     arguments=["diff_cont"],
-    # )
-
-    # delayed_diff_drive_spawner = RegisterEventHandler(
-    #     event_handler=OnProcessStart(
-    #         target_action=controller_manager,
-    #         on_start=[diff_drive_spawner],
-    #     )
-    # )
-
-    # joint_broad_spawner = Node(
-    #     package="controller_manager",
-    #     executable="spawner.py",
-    #     arguments=["joint_broad"],
-    # )
-
-    # delayed_joint_broad_spawner = RegisterEventHandler(
-    #     event_handler=OnProcessStart(
-    #         target_action=controller_manager,
-    #         on_start=[joint_broad_spawner],
-    #     )
-    # )
-
-
-    # Code for delaying a node (I haven't tested how effective it is)
-    # 
-    # First add the below lines to imports
-    # from launch.actions import RegisterEventHandler
-    # from launch.event_handlers import OnProcessExit
-    #
-    # Then add the following below the current diff_drive_spawner
-    # delayed_diff_drive_spawner = RegisterEventHandler(
-    #     event_handler=OnProcessExit(
-    #         target_action=spawn_entity,
-    #         on_exit=[diff_drive_spawner],
-    #     )
-    # )
-    #
-    # Replace the diff_drive_spawner in the final return with delayed_diff_drive_spawner
-
-
-
-    # Launch them all!
+    # Launch all nodes
     return LaunchDescription([
         rsp,
-        # joystick,
-        # twist_mux,
-        # delayed_controller_manager,
-        # delayed_diff_drive_spawner,
-        # delayed_joint_broad_spawner
+        rplidar_node,
+        laser_scan_matcher_node,
+        slam_toolbox_node,  
     ])
