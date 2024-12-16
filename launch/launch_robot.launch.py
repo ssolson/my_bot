@@ -39,7 +39,7 @@ def generate_launch_description():
         name='odometry_publisher',
         output='screen',
         parameters=[{
-            'use_sim_time': False,  # Ensure sim time is disabled
+            'use_sim_time': False,  
             'base_frame': 'base_link',
             'odom_frame': 'odom_matcher',
             'laser_frame': 'laser_frame',
@@ -52,7 +52,7 @@ def generate_launch_description():
     slam_toolbox_params = os.path.join(
         get_package_share_directory(package_name),
         'config',
-        'mapper_params_online_async.yaml'  # Path to your SLAM toolbox params
+        'mapper_params_online_async.yaml'  
     )
 
     slam_toolbox_node = Node(
@@ -60,9 +60,9 @@ def generate_launch_description():
         executable='async_slam_toolbox_node',
         name='slam_toolbox',
         output='screen',
-        parameters=[slam_toolbox_params, {'use_sim_time': False}]  # Set sim time to false
+        parameters=[slam_toolbox_params, {'use_sim_time': False}] 
     )
-
+    
     # Launch all nodes
     return LaunchDescription([
         rsp,
